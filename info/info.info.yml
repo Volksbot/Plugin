@@ -1,0 +1,5 @@
+name: Info Modul
+type: module
+description: Stellt Informationen zur Volksbot Wissensplattform zur Verfügung
+package: Custom
+core: 8.x

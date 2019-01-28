@@ -1,0 +1,6 @@
+info:
+  path: /info
+  defaults:
+    _controller: Drupal\info\Controller\InfoController::info
+  requirements:
+    _permission: 'access content'
