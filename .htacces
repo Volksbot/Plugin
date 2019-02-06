@@ -1,0 +1,163 @@
+#
+# Apache/PHP/Drupal Einstellungen:
+#
+
+<FilesMatch "\.(engine|inc|install|make|module|profile|po|sh|.*sql|theme|twig|tpl(\.php)?|xtmpl|yml)(~|\.sw[op]|\.bak|\.orig|\.save)?$|^(\.(?!well-known).*|Entries.*|Repository|Root|Tag|Template|composer\.(json|lock))$|^#.*#$|\.php(~|\.sw[op]|\.bak|\.orig|\.save)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    # Zugriffsteuerung auf die Webseite
+    deny from all
+    # Unterbindet den Zugriff für alle Nutzer
+    allow from 194.94.23.
+    # Erlaubt lediglich den Zugriff für Nutzer die vom HWR-Wlan zugreifen
+  </IfModule>
+</FilesMatch>
+
+# Keine Verzeichnisauflistungen für URLs anzeigen, die einem Verzeichnis zugeordnet sind.
+Options -Indexes
+
+DirectoryIndex index.php index.html index.htm
+
+# Fügt die Kodierung für Scalable Vector Graphics hinzu.
+AddType image/svg+xml svg svgz
+AddEncoding gzip svgz
+
+# Folgende PHP-Einstellungen können während des Betriebs der Webseite nicht geändert werden. Siehe
+# Seiten/default/default.settings.php und
+# Drupal\Core\DrupalKernel::bootEnvironment() um Einstellungen vorzunehmen, die von der
+# die während des Webseitenbetriebs geänder werden können.
+
+# PHP 5, Apache 1 and 2.
+<IfModule mod_php5.c>
+  php_value assert.active                   0
+  php_flag session.auto_start               off
+  php_value mbstring.http_input             pass
+  php_value mbstring.http_output            pass
+  php_flag mbstring.encoding_translation    off
+
+# Beim Fehlen von $HTTP_RAW_POST_DATA können Probleme bei PHP 5.6. auftreten.
+  php_value always_populate_raw_post_data   -1
+</IfModule>
+
+# Erfordert, dass mod_expires aktiviert ist.
+<IfModule mod_expires.c>
+  ExpiresActive On
+
+# Packt alle Datein in ein Cache für 2 Wochen nach dem Zugriff (A).
+  ExpiresDefault A1209600
+
+  <FilesMatch \.php$>
+    # Es wird empfohlen PHP-Skripte nicht im Cache zu speichern.
+    ExpiresActive Off
+  </FilesMatch>
+</IfModule>
+
+# Um alles, was nicht in index.php existiert, umzuleiten, kann die FallBackResource Direktive
+# verwendet werden.
+# Dies erfordert die Apache-Version >= 2.2.16.
+<IfModule !mod_rewrite.c>
+  FallbackResource /index.php
+</IfModule>
+
+<IfModule mod_rewrite.c>
+  RewriteEngine on
+
+# Setzt "protossl" auf "s", wenn die Webseite über https://. erreicht wird.
+# Webseiten, die eine sichere Kommunikation erfordern, sind auf ein SSL-Zertifikat angewiesen.
+# Ohne SSL-Zertifikat werden die Daten im Klartext übertragen und können dadurch problemlos abgehört werden.
+# Eine SSL-Verbindung erkennt man am einfachsten am vorgestellten „https://“ vor einer Website-URL.
+# protossl sorgt dafür, so dass wenn http://www.example.com aufgerufen wird, stattdessen zu
+# https://www.example.com weitergeleitet wird.
+  RewriteRule ^ - [E=protossl]
+  RewriteCond %{HTTPS} on
+  RewriteRule ^ - [E=protossl:s]
+
+  RewriteRule ^ - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+ # Blockiert den Zugriff auf "versteckte" Verzeichnisse, deren Namen mit einem Punkt beginnen.
+ # Dazu gehören Verzeichnisse, die von Versionskontrollsystemen wie Git zum Speichern von Steuerdateien
+ # verwendet werden. Dateien, deren Name mit einem Punkt beginnt, sowie die von CVS verwendeten Steuerdateien
+ # sind durch die oben genannte FilesMatch-Anweisung geschützt.
+ # HINWEIS: Dies funktioniert nur, wenn mod_rewrite aktiviert ist. Ohne mod_rewrite ist es nicht möglich,
+ # den Zugriff auf ganze Verzeichnisse von .htaccess aus zu blockieren, da <DirectoryMatch> hier nicht
+ # erlaubt ist.
+  RewriteRule "/\.|^\.(?!well-known/)" - [F]
+# Wenn auf die Website sowohl mit, als auch ohne das Präfix'www.' zugegriffen werden kann,
+# können mit einer der folgenden Einstellungen Benutzer auf Ihre bevorzugte URL umgeleitet werden.
+# Entweder MIT oder OHNE das Präfix'www.', nur eine Option ist denkbar.
+
+# Um alle Benutzer umzuleiten, die auf die Website mit dem Präfix "www." zugreifen (http://example.com
+# wird auf http://www.example.com umgeleitet)
+# Folgendes stehenlassen:  RewriteCond %{HTTP_HOST}
+
+# Um alle Benutzer auf die Website OHNE das Präfix "www." umzuleiten
+#(http://www.example.com wird auf http://example.com umgeleitet)
+# Folgendes stehenlassen:
+# RewriteCond %{HTTP_HOST}} ^wwww\..(.+)$[NC]
+# RewriteRule ^ http%{ENV:protossl}://%1%{REQUEST_URI}[L,R=301]
+# Die RewriteBase muss geändert werden, wenn Drupal in einem Unterverzeichnis oder in einem VirtualDocumentRoot
+# verwendet wird.
+
+RewriteCond %{HTTP_HOST} !^wwww\... (NC)
+RewriteRule ^ http%{ENV:protossl}://www.%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+Übersetzt mit www.DeepL.com/Translator
+
+# Leitet die PHP-Dateien an ihre neuen Speicherorte weiter.
+  RewriteCond %{REQUEST_URI} ^(.*)?/(install.php) [OR]
+  RewriteCond %{REQUEST_URI} ^(.*)?/(rebuild.php)
+  RewriteCond %{REQUEST_URI} !core
+  RewriteRule ^ %1/core/%2 [L,QSA,R=301]
+
+# Überschreibt install.php während der Installation neu, um zu sehen, ob mod_rewrite funktioniert.
+  RewriteRule ^core/install.php core/install.php?rewrite=ok [QSA,L]
+
+# Übergibt alle Anfragen, die sich nicht direkt auf Dateien im Dateisystem beziehen, an index.php.
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteCond %{REQUEST_URI} !=/favicon.ico
+  RewriteRule ^ index.php [L]
+
+# Aus Sicherheitsgründen wird empfohlen den Zugriff auf andere PHP-Dateien auf öffentlichen Websites zu verweigern.
+# Hinweis: Die folgenden URI-Bedingungen sind nicht am Anfang verankert (^), da sich Drupal in einem
+# Unterverzeichnis befinden kann. Um die Sicherheit weiter zu verbessern, kann '!/' durch '!^/' ersetzt werden.
+# Zugriff auf PHP-Dateien in /core (wie authorize.php oder install.php)erlauben:
+  RewriteCond %{REQUEST_URI} !/core/[^/]*\.php$
+# Erlaubt den Zugriff auf testspezifische PHP-Dateien:
+  RewriteCond %{REQUEST_URI} !/core/modules/system/tests/https?.php
+# Erlaubt den Zugriff auf den benutzerdefinierten Frontcontroller des Statistikmoduls.
+# Diese Regel kann angepasst und kopiert werden, um PHP-Dateien direkt in bereitgestellten oder benutzerdefinierten
+# Modulen auszuführen oder um eine andere PHP-Anwendung im gleichen Verzeichnis auszuführen.
+  RewriteCond %{REQUEST_URI} !/core/modules/statistics/statistics.php$
+# Verweigert den Zugriff auf alle anderen PHP-Dateien, die nicht den oben genannten Regeln entsprechen.
+# Insbesondere wird nicht zulassen, dass autoload.php direkt bedient wird.
+  RewriteRule "^(.+/.*|autoload)\.php($|/)" - [F]
+
+# Regeln, um gzip-komprimierte CSS- und JS-Dateien korrekt zu bedienen.
+# Erfordert, dass sowohl mod_rewrite als auch mod_headers aktiviert ist.
+  <IfModule mod_headers.c>
+    RewriteCond %{HTTP:Accept-encoding} gzip
+    RewriteCond %{REQUEST_FILENAME}\.gz -s
+    RewriteRule ^(.*)\.css $1\.css\.gz [QSA]
+    RewriteCond %{HTTP:Accept-encoding} gzip
+    RewriteCond %{REQUEST_FILENAME}\.gz -s
+    RewriteRule ^(.*)\.js $1\.js\.gz [QSA]
+    RewriteRule \.css\.gz$ - [T=text/css,E=no-gzip:1]
+    RewriteRule \.js\.gz$ - [T=text/javascript,E=no-gzip:1]
+
+    <FilesMatch "(\.js\.gz|\.css\.gz)$">
+      Header set Content-Encoding gzip
+# Erzwingt Proxies gezippte und nicht gezippte css/js-Dateien separat zwischenzuspeichern.
+      Header append Vary Accept-Encoding
+    </FilesMatch>
+  </IfModule>
+</IfModule>
+
+# Diverse Header-Fixes
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options nosniff
+  RequestHeader unset Proxy
+</IfModule>
